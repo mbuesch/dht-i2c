@@ -1,0 +1,7 @@
+/dep/
+/obj/
+
+/*.bin
+/*.dasm
+/*.hex
+/*.map
