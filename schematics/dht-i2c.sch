@@ -31,16 +31,17 @@ LIBS:opto
 LIBS:atmel
 LIBS:contrib
 LIBS:valves
+LIBS:dht-i2c-cache
 EELAYER 25 0
 EELAYER END
 $Descr A4 11693 8268
 encoding utf-8
 Sheet 1 1
-Title ""
+Title "DHT11 / DHT22 to I2C converter"
 Date ""
 Rev ""
-Comp ""
-Comment1 ""
+Comp "Copyright (c) 2018 Michael Buesch <m@bues.ch>"
+Comment1 "https://bues.ch/"
 Comment2 ""
 Comment3 ""
 Comment4 ""
