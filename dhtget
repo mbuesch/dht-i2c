@@ -20,8 +20,9 @@
 #
 
 import sys
-import smbus
 import time
+import getopt
+import smbus
 
 
 class DHT_via_I2C(object):
@@ -32,7 +33,13 @@ class DHT_via_I2C(object):
 	DHT11 = 0
 	DHT22 = 1
 
-	def __init__(self, devType=DHT11, i2cBus=1, i2cAddr=0x76):
+	DEFAULT_BUS = 1
+	DEFAULT_ADDR = 0x76
+
+	def __init__(self,
+		     devType=DHT11,
+		     i2cBus=DEFAULT_BUS,
+		     i2cAddr=DEFAULT_ADDR):
 		self.__devType = devType
 		self.__seqCount = -1
 		self.__temp = 0.0
@@ -101,7 +108,7 @@ class DHT_via_I2C(object):
 
 	@property
 	def tempCelsius(self):
-		"""Get the measured temperature, in Celsius.
+		"""Get the measured temperature, in Celcius.
 		"""
 		return self.__temp
 
@@ -117,13 +124,104 @@ class DHT_via_I2C(object):
 		"""
 		return self.__hum
 
-def main():
-	dht = DHT_via_I2C(DHT_via_I2C.DHT11)
-	while True:
+def usage():
+	print("Usage: dhtget [OPTIONS]")
+	print()
+	print(" -1|--dht11          The connected device is a DHT11 (default).")
+	print(" -2|--dht22          The connected device is a DHT22.")
+	print(" -l|--loop COUNT     Run in a loop.")
+	print("                     If count is negative, run an infinite loop.")
+	print("                     Default: Run once.")
+	print(" -c|--csv            Print output as CSV.")
+	print(" -H|--no-header      Do not print CSV header.")
+	print(" -f|--fahrenheit     Use Fahrenheit instead of Celsius.")
+	print(" -b|--i2c-bus BUS    Use I2C bus number BUS. Default: 1.")
+	print(" -a|--i2c-addr ADDR  Use I2C address ADDR. Default: 0x76.")
+	print(" -h|--help           Print this help text.")
+
+def main(argv):
+	opt_devType = DHT_via_I2C.DHT11
+	opt_loop = 1
+	opt_csv = False
+	opt_fahrenheit = False
+	opt_header = True
+	opt_i2cBus = DHT_via_I2C.DEFAULT_BUS
+	opt_i2cAddr = DHT_via_I2C.DEFAULT_ADDR
+
+	try:
+		opts, args = getopt.getopt(argv[1:],
+			"h12l:cHfb:a:",
+			[ "help",
+			  "dht11", "dht22",
+			  "loop=",
+			  "csv", "no-header",
+			  "fahrenheit",
+			  "i2c-bus=",
+			  "i2c-addr=", ])
+	except getopt.GetoptError as e:
+		print(str(e), file=sys.stderr)
+		return 1
+	for o, v in opts:
+		if o in ("-h", "--help"):
+			usage()
+			return 0
+		if o in ("-1", "--dht11"):
+			opt_devType = DHT_via_I2C.DHT11
+		if o in ("-2", "--dht22"):
+			opt_devType = DHT_via_I2C.DHT22
+		if o in ("-l", "--loop"):
+			try:
+				opt_loop = int(v, 0)
+			except ValueError as e:
+				print("Invalid -l|--loop value.", file=sys.stderr)
+				return 1
+		if o in ("-c", "--csv"):
+			opt_csv = True
+		if o in ("-H", "--no-header"):
+			opt_header = False
+		if o in ("-f", "--fahrenheit"):
+			opt_fahrenheit = True
+		if o in ("-b", "--i2c-bus"):
+			try:
+				opt_i2cBus = int(v, 0)
+			except ValueError as e:
+				print("Invalid -b|--i2c-bus value.", file=sys.stderr)
+				return 1
+		if o in ("-a", "--i2c-addr"):
+			try:
+				opt_i2cAddr = int(v, 0)
+			except ValueError as e:
+				print("Invalid -a|--i2c-addr value.", file=sys.stderr)
+				return 1
+
+	try:
+		dht = DHT_via_I2C(devType=opt_devType,
+				  i2cBus=opt_i2cBus,
+				  i2cAddr=opt_i2cAddr)
+	except OSError as e:
+		print("Failed to establish DHT-I2C communication:\n%s" % str(e),
+		      file=sys.stderr)
+		return 1
+
+	tempUnit = "F" if opt_fahrenheit else "*C"
+	if opt_csv and opt_header:
+		print("Temperature %s;Humidity %%" % tempUnit)
+	count = opt_loop
+	while count != 0:
 		if dht.update():
-			print("Temp: ", dht.tempCelsius)
-			print("Hum:  ", dht.humidityPercent)
+			temp = dht.tempFahrenheit if opt_fahrenheit else dht.tempCelsius
+			hum = dht.humidityPercent
+			if opt_csv:
+				print("%.1f;%.1f" % (temp, hum))
+			else:
+				print("Temperature: %.1f %s" % (temp, tempUnit))
+				print("Humidity:    %.1f %%" % hum)
+			if count > 0:
+				count -= 1
 		time.sleep(0.1)
 	return 0
 
-sys.exit(main())
+try:
+	sys.exit(main(sys.argv))
+except KeyboardInterrupt as e:
+	sys.exit(0)
