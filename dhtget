@@ -207,15 +207,18 @@ def main(argv):
 	if opt_csv and opt_header:
 		print("Temperature %s;Humidity %%" % tempUnit)
 	count = opt_loop
+	stream = sys.stdout
 	while count != 0:
 		if dht.update():
 			temp = dht.tempFahrenheit if opt_fahrenheit else dht.tempCelsius
 			hum = dht.humidityPercent
 			if opt_csv:
-				print("%.1f;%.1f" % (temp, hum))
+				stream.write("%.1f;%.1f\n" % (temp, hum))
 			else:
-				print("Temperature: %.1f %s" % (temp, tempUnit))
-				print("Humidity:    %.1f %%" % hum)
+				stream.write("Temperature: %.1f %s\n" % (
+					     temp, tempUnit))
+				stream.write("Humidity:    %.1f %%\n" % hum)
+			stream.flush()
 			if count > 0:
 				count -= 1
 		time.sleep(0.1)
