@@ -1,0 +1,129 @@
+#!/usr/bin/env python3
+#
+# Read values from DHT11/22 to I2C converter
+#
+# Copyright (c) 2018 Michael Buesch <m@bues.ch>
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License along
+# with this program; if not, write to the Free Software Foundation, Inc.,
+# 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+#
+
+import sys
+import smbus
+import time
+
+
+class DHT_via_I2C(object):
+	"""Read a DHT11/22 sensor via I2C.
+	"""
+
+	# Device types.
+	DHT11 = 0
+	DHT22 = 1
+
+	def __init__(self, devType=DHT11, i2cBus=1, i2cAddr=0x76):
+		self.__devType = devType
+		self.__seqCount = -1
+		self.__temp = 0.0
+		self.__hum = 0.0
+		self.__i2cAddr = i2cAddr
+		self.__i2c = smbus.SMBus(i2cBus)
+
+	def __crc(self, data):
+		crc = 0
+		for d in data:
+			crc ^= d
+			for i in range(8):
+				if crc & 0x80:
+					crc = (crc << 1) & 0xFF
+					crc ^= 0x07
+				else:
+					crc = (crc << 1) & 0xFF
+
+		return crc & 0xFF
+
+	def update(self):
+		"""Try to get new temperature and humidity values.
+		Returns True, if new values have been fetched.
+		"""
+		# Read the data from I2C.
+		try:
+			data = self.__i2c.read_i2c_block_data(
+					self.__i2cAddr,
+					self.__devType, 7)
+		except OSError as e:
+			return False
+		# Extract and check the I2C data.
+		seqCount = data[0]
+		dhtData = data[1:-1]
+		dataCRC = data[-1]
+		calcCRC = self.__crc(data[0:-1])
+		if dataCRC != calcCRC:
+			return False
+		if seqCount == self.__seqCount:
+			return False
+
+		# Extract and check the DHT11/22 data.
+		hum = (dhtData[0] << 8) | (dhtData[1])
+		temp = (dhtData[2] << 8) | (dhtData[3])
+		calcChecksum = sum(dhtData[0:-1]) & 0xFF
+		dataChecksum = dhtData[-1]
+		if dataChecksum != calcChecksum:
+			return False
+
+		# Convert the temperature and humidity values.
+		if self.__devType == self.DHT11:
+			divisor = 256.0
+			tempFactor = 1.0
+		else:
+			divisor = 10.0
+			if temp & 0x8000:
+				temp &= 0x7FFF
+				tempFactor = -1.0
+			else:
+				tempFactor = 1.0
+		self.__hum = float(hum) / divisor
+		self.__temp = (float(temp) / divisor) * tempFactor
+
+		self.__seqCount = seqCount
+		return True
+
+	@property
+	def tempCelsius(self):
+		"""Get the measured temperature, in Celcius.
+		"""
+		return self.__temp
+
+	@property
+	def tempFahrenheit(self):
+		"""Get the measured temperature, in Fahrenheit.
+		"""
+		return self.tempCelsius * 1.8 + 32
+
+	@property
+	def humidityPercent(self):
+		"""Get the measured humidity, in percent.
+		"""
+		return self.__hum
+
+def main():
+	dht = DHT_via_I2C(DHT_via_I2C.DHT11)
+	while True:
+		if dht.update():
+			print("Temp: ", dht.tempCelsius)
+			print("Hum:  ", dht.humidityPercent)
+		time.sleep(0.1)
+	return 0
+
+sys.exit(main())
