@@ -101,7 +101,7 @@ class DHT_via_I2C(object):
 
 	@property
 	def tempCelsius(self):
-		"""Get the measured temperature, in Celcius.
+		"""Get the measured temperature, in Celsius.
 		"""
 		return self.__temp
 
