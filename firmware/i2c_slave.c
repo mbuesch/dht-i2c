@@ -1,7 +1,7 @@
 /*
  * USI I2C bus slave
  *
- * Copyright (c) 2016 Michael Buesch <m@bues.ch>
+ * Copyright (c) 2016-2018 Michael Buesch <m@bues.ch>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -57,8 +57,8 @@ enum i2cs_state {
 	I2CS_STATE_RCV_ACK,	/* Handle received ack after sent data */
 };
 
-#define I2CS_NO_ADDR		0xFF
-#define I2CS_NO_SLAVE		0xFF
+#define I2CS_NO_ADDR		0xFFu
+#define I2CS_NO_SLAVE		0xFFu
 
 static enum i2cs_state _used i2cs_state;
 static uint8_t _used i2cs_addrs[I2CS_MAX_NR_SLAVES];
@@ -74,26 +74,26 @@ static const struct i2c_slave_ops __flash _used *i2cs_ops[I2CS_MAX_NR_SLAVES];
 
 static void clkstretch_timer_init(void)
 {
-	TCCR0B = 0;
+	TCCR0B = 0u;
 
-	TCNT0 = 0;
-	OCR0A = 0;
-	OCR0B = 0;
+	TCNT0 = 0u;
+	OCR0A = 0u;
+	OCR0B = 0u;
 
-	TIMSK &= (uint8_t)~((1 << OCIE0A) | (1 << OCIE0B) | (1 << TOIE0));
-	TIFR = (1 << OCF0A) | (1 << OCF0B) | (1 << TOV0);
+	TIMSK &= (uint8_t)~((1u << OCIE0A) | (1u << OCIE0B) | (1u << TOIE0));
+	TIFR = (1u << OCF0A) | (1u << OCF0B) | (1u << TOV0);
 
 	/* Normal mode, prescaler 8. */
 	build_assert(F_CPU == 16000000UL);
-	GTCCR &= (uint8_t)~(1 << PSR0);
-	GTCCR &= (uint8_t)~(1 << TSM);
-	TCCR0A = (0 << COM0A1) | (0 << COM0A0) |
-		 (0 << COM0B1) | (0 << COM0B0) |
-		 (0 << WGM01) | (0 << WGM00);
-	TCCR0B = (0 << FOC0A) | (0 << FOC0B) |
-		 (0 << WGM02) |
-		 (0 << CS02) | (1 << CS01) | (0 << CS00);
-#define TCNT0_KHZ 2000
+	GTCCR &= (uint8_t)(~(1u << PSR0) & 0xFFu);
+	GTCCR &= (uint8_t)(~(1u << TSM) & 0xFFu);
+	TCCR0A = (0u << COM0A1) | (0u << COM0A0) |
+		 (0u << COM0B1) | (0u << COM0B0) |
+		 (0u << WGM01) | (0u << WGM00);
+	TCCR0B = (0u << FOC0A) | (0u << FOC0B) |
+		 (0u << WGM02) |
+		 (0u << CS02) | (1u << CS01) | (0u << CS00);
+#define TCNT0_KHZ 2000u
 }
 
 /* Prepare the clock stretching workaround timer.
@@ -117,39 +117,39 @@ static void clkstretch_timer_init(void)
 static void clkstretch_timer_init(void) { }
 #define CLKSTRETCH_TIMER_PREPARE()	""
 #define CLKSTRETCH_TIMER_WAIT()		""
-#define TCNT0_KHZ			0
+#define TCNT0_KHZ			0u
 
 #endif /* I2CS_CLKSTRETCH_WORKAROUND */
 
 #define USICR_BASE	(		\
-		(1 << USISIE) |		\
-		(0 << USIOIE) |		\
-		(1 << USIWM1) |		\
-		(0 << USIWM0) |		\
-		(1 << USICS1) |		\
-		(0 << USICS0) |		\
-		(0 << USICLK) |		\
-		(0 << USITC)		\
+		(1u << USISIE) |	\
+		(0u << USIOIE) |	\
+		(1u << USIWM1) |	\
+		(0u << USIWM0) |	\
+		(1u << USICS1) |	\
+		(0u << USICS0) |	\
+		(0u << USICLK) |	\
+		(0u << USITC)		\
 	)
 
 #define USISR_BASE	(		\
-		(0 << USISIF) |		\
-		(1 << USIOIF) |		\
-		(1 << USIPF) |		\
-		(0 << USICNT2) |	\
-		(0 << USICNT1) |	\
-		(0 << USICNT0)		\
+		(0u << USISIF) |	\
+		(1u << USIOIF) |	\
+		(1u << USIPF) |		\
+		(0u << USICNT2) |	\
+		(0u << USICNT1) |	\
+		(0u << USICNT0)		\
 	)
 
 ISR(USI_START_vect)
 {
 	memory_barrier();
 
-	SDA_DDR &= (uint8_t)~(1 << SDA_BIT);
+	SDA_DDR &= (uint8_t)~(1u << SDA_BIT);
 
 	/* Wait for SCL low (or stop condition). */
-	while ((SCL_PIN & (1 << SCL_BIT)) &&
-	       !((SDA_PIN & (1 << SDA_BIT)))) {
+	while ((SCL_PIN & (1u << SCL_BIT)) &&
+	       !((SDA_PIN & (1u << SDA_BIT)))) {
 		/* Wait.
 		 * We depend on the WDT to restart the MCU, if this loop never
 		 * terminates due to external issues.
@@ -157,11 +157,11 @@ ISR(USI_START_vect)
 	}
 
 	/* Check whether we do not have a stop condition. */
-	if (!(SDA_PIN & (1 << SDA_BIT))) {
+	if (!(SDA_PIN & (1u << SDA_BIT))) {
 		/* Enable counter overflow interrupt. */
-		USICR = USICR_BASE | (1 << USIOIE) | (0 << USIWM0);
+		USICR = USICR_BASE | (1u << USIOIE) | (0u << USIWM0);
 	}
-	USISR = USISR_BASE | (1 << USISIF) | (1 << USICNT0);
+	USISR = USISR_BASE | (1u << USISIF) | (1u << USICNT0);
 
 	i2cs_state = I2CS_STATE_ADDR;
 	i2cs_active_slave = I2CS_NO_SLAVE;
@@ -229,7 +229,7 @@ static uint8_t _used slaveop_receive(uint8_t data)
 	[_TCNT0]			"I" (_SFR_IO_ADDR(TCNT0)),	\
 	[_TIFR]				"I" (_SFR_IO_ADDR(TIFR)),	\
 	[_TOV0]				"M" (TOV0),			\
-	[_STRETCH_TIMER_PRELOAD]	"M" (256 - ((TCNT0_KHZ / I2CS_EXPECTED_KHZ) + 1)), \
+	[_STRETCH_TIMER_PRELOAD]	"M" (256u - ((TCNT0_KHZ / I2CS_EXPECTED_KHZ) + 1u)), \
 	[_USIDR]			"I" (_SFR_IO_ADDR(USIDR)),	\
 	[_USICR]			"I" (_SFR_IO_ADDR(USICR)),	\
 	[_USISR]			"I" (_SFR_IO_ADDR(USISR)),	\
@@ -263,8 +263,8 @@ static void _naked _used switch_to_start_condition_state(void)
 	: /* outputs */
 	: /* inputs */
 		IN_CONSTR_BASE,
-		[_cr_scond]	"M" (USICR_BASE | (0 << USIOIE) | (0 << USIWM0)),
-		[_sr_scond]	"M" (USISR_BASE | (0 << USISIF) | (0 << USICNT0))
+		[_cr_scond]	"M" (USICR_BASE | (0u << USIOIE) | (0u << USIWM0)),
+		[_sr_scond]	"M" (USISR_BASE | (0u << USISIF) | (0u << USICNT0))
 	: /* clobbers */
 		"memory"
 	);
@@ -330,8 +330,8 @@ static void _naked _used handle_state_addr(void)
 	: /* outputs */
 	: /* inputs */
 		IN_CONSTR_BASE,
-		[_cr_ack]	"M" (USICR_BASE | (1 << USIOIE) | (1 << USIWM0)),
-		[_sr_ack]	"M" (USISR_BASE | (0 << USISIF) | (14 << USICNT0))
+		[_cr_ack]	"M" (USICR_BASE | (1u << USIOIE) | (1u << USIWM0)),
+		[_sr_ack]	"M" (USISR_BASE | (0u << USISIF) | (14u << USICNT0))
 	: /* clobbers */
 		"memory"
 	);
@@ -373,8 +373,8 @@ static void _naked _used handle_state_prep_snd(void)
 	: /* outputs */
 	: /* inputs */
 		IN_CONSTR_BASE,
-		[_cr_send]	"M" (USICR_BASE | (1 << USIOIE) | (0 << USIWM0)),
-		[_sr_send]	"M" (USISR_BASE | (0 << USISIF) | (2 << USICNT0))
+		[_cr_send]	"M" (USICR_BASE | (1u << USIOIE) | (0u << USIWM0)),
+		[_sr_send]	"M" (USISR_BASE | (0u << USISIF) | (2u << USICNT0))
 	: /* clobbers */
 		"memory"
 	);
@@ -406,8 +406,8 @@ static void _naked _used handle_state_prep_rcv(void)
 	: /* outputs */
 	: /* inputs */
 		IN_CONSTR_BASE,
-		[_cr_rddata]	"M" (USICR_BASE | (1 << USIOIE) | (0 << USIWM0)),
-		[_sr_rddata]	"M" (USISR_BASE | (0 << USISIF) | (2 << USICNT0))
+		[_cr_rddata]	"M" (USICR_BASE | (1u << USIOIE) | (0u << USIWM0)),
+		[_sr_rddata]	"M" (USISR_BASE | (0u << USISIF) | (2u << USICNT0))
 	: /* clobbers */
 		"memory"
 	);
@@ -447,8 +447,8 @@ static void _naked _used handle_state_rcv(void)
 	: /* outputs */
 	: /* inputs */
 		IN_CONSTR_BASE,
-		[_cr_ack]	"M" (USICR_BASE | (1 << USIOIE) | (1 << USIWM0)),
-		[_sr_ack]	"M" (USISR_BASE | (0 << USISIF) | (14 << USICNT0))
+		[_cr_ack]	"M" (USICR_BASE | (1u << USIOIE) | (1u << USIWM0)),
+		[_sr_ack]	"M" (USISR_BASE | (0u << USISIF) | (14u << USICNT0))
 	: /* clobbers */
 		"memory"
 	);
@@ -495,11 +495,11 @@ static void _naked _used handle_state_rcvproc(void)
 	: /* outputs */
 	: /* inputs */
 		IN_CONSTR_BASE,
-		[_cr_addrread]	"M" (USICR_BASE | (1 << USIOIE) | (0 << USIWM0)),
+		[_cr_addrread]	"M" (USICR_BASE | (1u << USIOIE) | (0u << USIWM0)),
 #if 0
-		[_sr_addrread]	"M" (USISR_BASE | (0 << USISIF) | (2 << USICNT0))
+		[_sr_addrread]	"M" (USISR_BASE | (0u << USISIF) | (2u << USICNT0))
 #else
-		[_sr_addrread]	"M" (USISR_BASE | (0 << USISIF) | (1 << USICNT0))
+		[_sr_addrread]	"M" (USISR_BASE | (0u << USISIF) | (1u << USICNT0))
 #endif
 	: /* clobbers */
 		"memory"
@@ -531,8 +531,8 @@ static void _naked _used handle_state_snd(void)
 	: /* outputs */
 	: /* inputs */
 		IN_CONSTR_BASE,
-		[_cr_rdack]	"M" (USICR_BASE | (1 << USIOIE) | (1 << USIWM0)),
-		[_sr_rdack]	"M" (USISR_BASE | (0 << USISIF) | (14 << USICNT0))
+		[_cr_rdack]	"M" (USICR_BASE | (1u << USIOIE) | (1u << USIWM0)),
+		[_sr_rdack]	"M" (USISR_BASE | (0u << USISIF) | (14u << USICNT0))
 	: /* clobbers */
 		"memory"
 	);
@@ -619,7 +619,7 @@ void i2cs_add_slave(uint8_t addr, const struct i2c_slave_ops __flash *ops)
 {
 	uint8_t i;
 
-	for (i = 0; i < ARRAY_SIZE(i2cs_addrs); i++) {
+	for (i = 0u; i < ARRAY_SIZE(i2cs_addrs); i++) {
 		if (i2cs_addrs[i] == I2CS_NO_ADDR) {
 			i2cs_addrs[i] = addr;
 			i2cs_ops[i] = ops;
@@ -638,14 +638,14 @@ void i2cs_init(void)
 	clkstretch_timer_init();
 
 	/* SDA */
-	SDA_PORT |= (1 << SDA_BIT);
-	SDA_DDR &= (uint8_t)~(1 << SDA_BIT);
+	SDA_PORT |= (1u << SDA_BIT);
+	SDA_DDR &= (uint8_t)~(1u << SDA_BIT);
 
 	/* SCL */
-	SCL_PORT |= (1 << SCL_BIT);
-	SCL_DDR |= (1 << SCL_BIT);
+	SCL_PORT |= (1u << SCL_BIT);
+	SCL_DDR |= (1u << SCL_BIT);
 
 	/* Initialize USI in TWI slave mode. */
-	USICR = USICR_BASE | (0 << USIOIE) | (0 << USIWM0);
-	USISR = USISR_BASE | (1 << USISIF) | (0 << USICNT0);
+	USICR = USICR_BASE | (0u << USIOIE) | (0u << USIWM0);
+	USISR = USISR_BASE | (1u << USISIF) | (0u << USICNT0);
 }
