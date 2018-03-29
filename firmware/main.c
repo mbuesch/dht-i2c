@@ -103,6 +103,23 @@ static void dht_rx_callback(const uint8_t *data)
 	hostintf.next_data[sizeof(hostintf.next_data) - 1u] = crc;
 }
 
+static void basic_port_init(void)
+{
+	PORTB = 0u;
+	DDRB = (0u << DDB0) | /* Input: ISP-MOSI / I2C-SDA */
+	       (0u << DDB1) | /* Input: ISP-MISO */
+	       (0u << DDB2) | /* Input: ISP-SCK / I2C-SCL */
+	       (1u << DDB3) | /* Output: Debug pin */
+	       (0u << DDB4) | /* Input: DHT signal */
+	       (0u << DDB5);  /* Reset */
+	PORTB = (0u << PB0) | /* Input, no pullup: ISP-MOSI / I2C-SDA */
+		(1u << PB1) | /* Input, pullup: ISP-MISO */
+		(0u << PB2) | /* Input, no pullup: ISP-SCK / I2C-SCL */
+		(0u << PB3) | /* Output, low level: Debug pin */
+		(1u << PB4) | /* Input, pullup: DHT signal */
+		(0u << PB5);  /* Reset */
+}
+
 void early_init(void) __attribute__((naked, section(".init3"), used));
 void early_init(void)
 {
@@ -113,8 +130,7 @@ void early_init(void)
 int main(void) _mainfunc;
 int main(void)
 {
-	DDRB |= 1 << DDB3;
-
+	basic_port_init();
 	dht_init();
 	host_interface_init();
 	dht_start(dht_rx_callback);
@@ -123,11 +139,5 @@ int main(void)
 	irq_enable();
 	while (1) {
 		wdt_reset();
-
-#if 0
-		/* Toggle PB3 for verifying system clock. */
-		_delay_ms(10);
-		PINB |= 1 << PB3;
-#endif
 	}
 }
