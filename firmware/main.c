@@ -24,6 +24,7 @@
 #include "dht.h"
 
 #include <avr/wdt.h>
+#include <avr/sleep.h>
 #include <util/crc16.h>
 
 #include <string.h>
@@ -136,8 +137,10 @@ int main(void)
 	dht_start(dht_rx_callback);
 
 	wdt_enable(WDTO_250MS);
+	set_sleep_mode(SLEEP_MODE_IDLE);
 	irq_enable();
 	while (1) {
+		sleep_mode();
 		wdt_reset();
 	}
 }
